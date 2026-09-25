@@ -12,6 +12,7 @@ import {
   Select,
   Space,
   Spin,
+  Switch,
 } from "antd"
 import {
   ArrowDownOutlined,
@@ -62,6 +63,7 @@ const createEmptyConfigItem = (direction: "rx" | "tx" = "rx"): FrequencyFormItem
   target_freq_mhz: undefined,
   power_offset_db: undefined,
   is_alarm: ALARM_DISABLED_VALUE,
+  is_maintaining: -1,
   min: undefined,
   max: undefined,
 })
@@ -104,6 +106,7 @@ const buildConfigList = (
     target_freq_mhz: config.target_freq_mhz,
     power_offset_db: toFiniteNumber(config.power_offset_db),
     is_alarm: config.is_alarm ?? ALARM_DISABLED_VALUE,
+    is_maintaining: config.is_maintaining ?? -1,
     min: toFiniteNumber(config.min),
     max: toFiniteNumber(config.max),
   }))
@@ -117,6 +120,7 @@ const buildConfigPayloadByDirection = (config: FrequencyFormItem, direction: "rx
   target_freq_mhz: config.target_freq_mhz as number,
   power_offset_db: config.power_offset_db,
   is_alarm: config.is_alarm,
+  is_maintaining: config.is_maintaining ?? -1,
   min: config.min,
   max: config.max,
 })
@@ -372,6 +376,23 @@ const FrequencyConfigPage: React.FC<FrequencyConfigPageProps> = (props) => {
                                   <InputNumber />
                                 </Form.Item>
                                 <Row gutter={[12, 0]}>
+                                  <Col xs={24} sm={12} lg={8}>
+                                    <Form.Item
+                                      {...restField}
+                                      name={[field.name, "is_maintaining"]}
+                                      label={t(
+                                        "app.device.libiio.config.isMaintaining",
+                                        "Under Maintenance",
+                                      )}
+                                      getValueProps={(value) => ({ checked: value === 1 })}
+                                      normalize={(checked) => (checked ? 1 : -1)}
+                                    >
+                                      <Switch
+                                        checkedChildren={t("app.common.yes", "Yes")}
+                                        unCheckedChildren={t("app.common.no", "No")}
+                                      />
+                                    </Form.Item>
+                                  </Col>
                                   <Col xs={24} sm={12} lg={8}>
                                     <Form.Item
                                       {...restField}

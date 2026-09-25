@@ -76,6 +76,16 @@
     td {
       background: #dfe5f4;
     }
+
+    th.is-maintaining {
+      color: #334155;
+      background: #cbd5e1;
+    }
+
+    td.is-maintaining {
+      color: #64748b;
+      background: #cbd5e1;
+    }
   }
 
   .libiio-board-table__channel-row {
@@ -85,6 +95,15 @@
       font-size: 13px;
       background: linear-gradient(180deg, #3f7ad0 0%, #3b74c4 100%);
     }
+  }
+
+  .libiio-board-maintenance-label {
+    display: block;
+    margin-top: 2px;
+    color: #475569;
+    font-weight: 600;
+    font-size: 10px;
+    line-height: 1.2;
   }
 
   .libiio-board-table__row-label {
@@ -99,6 +118,35 @@
   .libiio-board-table__accent-abnormal {
     color: #ef4444;
     font-weight: 700;
+  }
+
+  .libiio-board-status-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    vertical-align: middle;
+  }
+
+  .libiio-board-status-indicator__dot {
+    display: block;
+    width: 10px;
+    height: 10px;
+    background: #94a3b8;
+    border: 2px solid rgba(255, 255, 255, 0.75);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(71, 85, 105, 0.25);
+  }
+
+  .libiio-board-status-indicator.libiio-board-table__accent-open
+    .libiio-board-status-indicator__dot {
+    background: #16a34a;
+  }
+
+  .libiio-board-status-indicator.libiio-board-table__accent-abnormal
+    .libiio-board-status-indicator__dot {
+    background: #ef4444;
   }
 
   .libiio-board-summary {

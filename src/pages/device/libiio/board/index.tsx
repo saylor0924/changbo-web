@@ -35,7 +35,12 @@ const BOARD_MODULE_ORDER: ModuleDirection[] = ["tx", "rx"]
 const ALARM_DISABLED_VALUE = 0
 type FrequencyChunk<T> = { key: string; channelOffset: number; items: T[] }
 type StatusTone = "normal" | "abnormal" | "none"
-type DisplayRow = { label: string; values: string[]; statusTones?: StatusTone[] }
+type DisplayRow = {
+  label: string
+  values: string[]
+  statusTones?: StatusTone[]
+  indicator?: boolean
+}
 type DerivedMetricRow = {
   key: string
   label: string
@@ -129,6 +134,16 @@ const getStatusClassName = (tone?: StatusTone) => {
   return ""
 }
 
+const getStatusLabel = (tone: StatusTone) => {
+  if (tone === "normal") {
+    return "Normal"
+  }
+  if (tone === "abnormal") {
+    return "Abnormal"
+  }
+  return "Not judged"
+}
+
 const fillMissingChannels = (channels: BoardChannel[] = []) => {
   const channelMap = new Map(channels.map((channel) => [channel.channel_no, channel]))
   const maxChannelNo = Math.max(...channels.map((channel) => channel.channel_no), 0)
@@ -150,11 +165,27 @@ const fillMissingChannels = (channels: BoardChannel[] = []) => {
   })
 }
 
-const getChannelPowerWValue = (channel: BoardChannel) =>
-  toFiniteNumberOrNull(channel.power_w)
+const getChannelPowerWValue = (channel: BoardChannel) => toFiniteNumberOrNull(channel.power_w)
 
 const getChannelRssiDbmValue = (channel: BoardChannel) =>
   toFiniteNumberOrNull(channel.rssi_dbm ?? channel.metric_value)
+
+const calculateVswr = (
+  forwardDbm: number | null,
+  reverseDbm: number | null,
+  activeCount: number,
+) => {
+  if (forwardDbm === null || reverseDbm === null || activeCount <= 0 || forwardDbm <= 30) {
+    return null
+  }
+  const forwardPower = 10 ** (forwardDbm / 10)
+  const reversePower = 10 ** (reverseDbm / 10) / activeCount
+  if (reversePower < 0 || reversePower >= forwardPower) {
+    return null
+  }
+  const gamma = Math.sqrt(reversePower / forwardPower)
+  return gamma >= 1 ? null : (1 + gamma) / (1 - gamma)
+}
 
 const getChannelAlarmMetricValue = (channel: BoardChannel, direction: ModuleDirection) =>
   direction === "tx"
@@ -162,7 +193,11 @@ const getChannelAlarmMetricValue = (channel: BoardChannel, direction: ModuleDire
     : toFiniteNumberOrNull(channel.rssi_dbm ?? channel.metric_value)
 
 const isChannelAbnormal = (channel: BoardChannel, direction: ModuleDirection) => {
-  if (!channel.configured || !isAlarmEnabled(channel.alarm_enabled ?? channel.is_alarm)) {
+  if (
+    channel.is_maintaining ||
+    !channel.configured ||
+    !isAlarmEnabled(channel.alarm_enabled ?? channel.is_alarm)
+  ) {
     return false
   }
 
@@ -196,7 +231,9 @@ const isModuleOffline = (module: BoardModule) => {
     return isOfflineValue(onlineValue)
   }
 
-  const statusText = (module.status || module.status_key || module.status_text)?.trim().toLowerCase()
+  const statusText = (module.status || module.status_key || module.status_text)
+    ?.trim()
+    .toLowerCase()
   if (statusText) {
     return statusText.includes("offline") || statusText.includes("离线")
   }
@@ -256,7 +293,11 @@ const FrequencyBoardPage: React.FC = () => {
 
   const getChannelStatus = useCallback(
     (channel: BoardChannel, direction: ModuleDirection) => {
-      if (!channel.configured || !isAlarmEnabled(channel.alarm_enabled ?? channel.is_alarm)) {
+      if (
+        channel.is_maintaining ||
+        !channel.configured ||
+        !isAlarmEnabled(channel.alarm_enabled ?? channel.is_alarm)
+      ) {
         return { text: "-", tone: "none" as StatusTone }
       }
 
@@ -281,7 +322,12 @@ const FrequencyBoardPage: React.FC = () => {
   )
 
   const buildDisplayRows = useCallback(
-    (direction: ModuleDirection, chunk: BoardChannel[]) => {
+    (
+      direction: ModuleDirection,
+      chunk: BoardChannel[],
+      reversePowerDbm?: number | string | null,
+      activeCountOverride?: number,
+    ) => {
       const rows: DisplayRow[] = [
         {
           label: t("app.device.libiio.board.frequency", "Frequency"),
@@ -290,19 +336,27 @@ const FrequencyBoardPage: React.FC = () => {
       ]
 
       if (direction === "tx") {
+        const forwardPowers = chunk.map((item) => getChannelRssiDbmValue(item))
+        const activeCount =
+          activeCountOverride ??
+          forwardPowers.filter((value) => value !== null && value > 30).length
+        const reversePower = toFiniteNumberOrNull(reversePowerDbm)
         rows.push({
           label: t("app.device.libiio.txMonitorPowerWithUnit", "Power (W)"),
-          values: chunk.map((item) =>
-            formatMetricValue(getChannelPowerWValue(item), " W"),
-          ),
+          values: chunk.map((item) => formatMetricValue(getChannelPowerWValue(item), " W")),
+        })
+        rows.push({
+          label: t("app.device.libiio.board.txVswr", "VSWR"),
+          values: forwardPowers.map((value) => {
+            const vswr = calculateVswr(value, reversePower, activeCount)
+            return vswr === null ? "-" : `${vswr.toFixed(2)}`
+          }),
         })
       }
 
       rows.push({
         label: t("app.device.libiio.rxRssiWithUnit", "RSSI (dBm)"),
-        values: chunk.map((item) =>
-          formatMetricValue(getChannelRssiDbmValue(item), " dBm"),
-        ),
+        values: chunk.map((item) => formatMetricValue(getChannelRssiDbmValue(item), " dBm")),
       })
 
       const statuses = chunk.map((item) => getChannelStatus(item, direction))
@@ -310,6 +364,7 @@ const FrequencyBoardPage: React.FC = () => {
         label: t("app.device.libiio.board.status", "Status"),
         values: statuses.map((item) => item.text),
         statusTones: statuses.map((item) => item.tone),
+        indicator: true,
       })
 
       return rows
@@ -331,23 +386,35 @@ const FrequencyBoardPage: React.FC = () => {
         device.isolation_db_alarm_min,
         device.isolation_db_alarm_max,
       )
-      const getDerivedStatus = (isAlarm: boolean) => ({
-        status: isAlarm ? t("app.device.libiio.board.statusAbnormal", "Abnormal") : "-",
-        statusTone: (isAlarm ? "abnormal" : "none") as StatusTone,
-      })
+      const getDerivedStatus = (
+        value: number | string | null | undefined,
+        isAlarm: boolean,
+        alarmEnabled?: number | string | boolean | null,
+      ) => {
+        const isJudged = isAlarmEnabled(alarmEnabled) && toFiniteNumberOrNull(value) !== null
+        const statusTone = !isJudged ? "none" : isAlarm ? "abnormal" : "normal"
+        return {
+          status: getStatusLabel(statusTone),
+          statusTone: statusTone as StatusTone,
+        }
+      }
 
       return [
         {
           key: "tx_vswr",
           label: t("app.device.libiio.board.txVswr", "TX VSWR"),
           value: formatBoardNumber(device.tx_vswr),
-          ...getDerivedStatus(txVswrIsAlarm),
+          ...getDerivedStatus(device.tx_vswr, txVswrIsAlarm, device.tx_vswr_alarm_enabled),
         },
         {
           key: "isolation_db",
           label: t("app.device.libiio.board.isolation", "Isolation"),
           value: formatBoardNumber(device.isolation_db, "dB"),
-          ...getDerivedStatus(isolationIsAlarm),
+          ...getDerivedStatus(
+            device.isolation_db,
+            isolationIsAlarm,
+            device.isolation_db_alarm_enabled,
+          ),
         },
       ]
     },
@@ -552,20 +619,45 @@ const FrequencyBoardPage: React.FC = () => {
                                       <th>{t("app.device.libiio.board.channel", "Channel")}</th>
                                       {CHANNEL_COLUMNS.map((channelNumber) => (
                                         <th
+                                          className={
+                                            chunk.items[channelNumber - 1]?.is_maintaining
+                                              ? "is-maintaining"
+                                              : ""
+                                          }
                                           key={`${device.device_id}-${chunk.key}-channel-${channelNumber}`}
                                         >
-                                          {t(
-                                            "app.device.libiio.board.channelWithNumber",
-                                            "Channel {number}",
-                                            {
-                                              number: chunk.channelOffset + channelNumber,
-                                            },
-                                          )}
+                                          <>
+                                            {t(
+                                              "app.device.libiio.board.channelWithNumber",
+                                              "Channel {number}",
+                                              {
+                                                number: chunk.channelOffset + channelNumber,
+                                              },
+                                            )}
+                                            {chunk.items[channelNumber - 1]?.is_maintaining ? (
+                                              <small className="libiio-board-maintenance-label">
+                                                {t(
+                                                  "app.device.libiio.board.maintenance",
+                                                  "Under maintenance",
+                                                )}
+                                              </small>
+                                            ) : null}
+                                          </>
                                         </th>
                                       ))}
                                     </tr>
 
-                                    {buildDisplayRows(direction, chunk.items).map((row) => (
+                                    {buildDisplayRows(
+                                      direction,
+                                      chunk.items,
+                                      device.tx_reverse_power_dbm,
+                                      direction === "tx"
+                                        ? section.chunks
+                                            .flatMap((currentChunk) => currentChunk.items)
+                                            .map((item) => getChannelRssiDbmValue(item))
+                                            .filter((value) => value !== null && value > 30).length
+                                        : undefined,
+                                    ).map((row) => (
                                       <tr
                                         key={`${device.device_id}-${direction}-${chunk.key}-${row.label}`}
                                       >
@@ -575,14 +667,47 @@ const FrequencyBoardPage: React.FC = () => {
                                         {CHANNEL_COLUMNS.map((channelNumber) => (
                                           <td
                                             key={`${device.device_id}-${direction}-${chunk.key}-${row.label}-${channelNumber}`}
+                                            className={
+                                              chunk.items[channelNumber - 1]?.is_maintaining
+                                                ? "is-maintaining"
+                                                : ""
+                                            }
                                           >
-                                            <span
-                                              className={getStatusClassName(
-                                                row.statusTones?.[channelNumber - 1],
-                                              )}
-                                            >
-                                              {row.values[channelNumber - 1] || "-"}
-                                            </span>
+                                            {row.indicator ? (
+                                              <span
+                                                className={`libiio-board-status-indicator ${getStatusClassName(
+                                                  row.statusTones?.[channelNumber - 1],
+                                                )}`}
+                                                role="img"
+                                                aria-label={getStatusLabel(
+                                                  row.statusTones?.[channelNumber - 1] || "none",
+                                                )}
+                                                title={getStatusLabel(
+                                                  row.statusTones?.[channelNumber - 1] || "none",
+                                                )}
+                                              >
+                                                <span className="libiio-board-status-indicator__dot" />
+                                              </span>
+                                            ) : (
+                                              <span
+                                                className={getStatusClassName(
+                                                  row.statusTones?.[channelNumber - 1],
+                                                )}
+                                              >
+                                                {chunk.items[channelNumber - 1]?.is_maintaining
+                                                  ? row.label ===
+                                                    t(
+                                                      "app.device.libiio.board.frequency",
+                                                      "Frequency",
+                                                    )
+                                                    ? `${row.values[channelNumber - 1]} · ${t(
+                                                        "app.device.libiio.board.maintenance",
+                                                        "Under maintenance",
+                                                      )}`
+                                                    : "-"
+                                                  : row.values[channelNumber - 1] || "-"}
+                                              </span>
+                                            )}
                                           </td>
                                         ))}
                                       </tr>
@@ -619,8 +744,15 @@ const FrequencyBoardPage: React.FC = () => {
                             <td>{t("app.device.libiio.board.status", "Status")}</td>
                             {derivedMetricRows.map((row) => (
                               <td key={row.key}>
-                                <span className={getStatusClassName(row.statusTone)}>
-                                  {row.status}
+                                <span
+                                  className={`libiio-board-status-indicator ${getStatusClassName(
+                                    row.statusTone,
+                                  )}`}
+                                  role="img"
+                                  aria-label={row.status}
+                                  title={row.status}
+                                >
+                                  <span className="libiio-board-status-indicator__dot" />
                                 </span>
                               </td>
                             ))}
@@ -636,8 +768,15 @@ const FrequencyBoardPage: React.FC = () => {
                             <th className="libiio-board-summary-table__index">
                               {t("app.device.libiio.board.sequence", "No.")}
                             </th>
-                            <th>{t("app.device.libiio.board.currentAlarmSummary", "Current Alarm Summary")}</th>
-                            <th>{t("app.device.libiio.board.troubleshooting", "Troubleshooting")}</th>
+                            <th>
+                              {t(
+                                "app.device.libiio.board.currentAlarmSummary",
+                                "Current Alarm Summary",
+                              )}
+                            </th>
+                            <th>
+                              {t("app.device.libiio.board.troubleshooting", "Troubleshooting")}
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -652,8 +791,15 @@ const FrequencyBoardPage: React.FC = () => {
                           ) : (
                             <tr>
                               <td>1</td>
-                              <td>{t("app.device.libiio.board.noCurrentAlarm", "No current alarms")}</td>
-                              <td>{t("app.device.libiio.board.noTroubleshootingRequired", "No action required")}</td>
+                              <td>
+                                {t("app.device.libiio.board.noCurrentAlarm", "No current alarms")}
+                              </td>
+                              <td>
+                                {t(
+                                  "app.device.libiio.board.noTroubleshootingRequired",
+                                  "No action required",
+                                )}
+                              </td>
                             </tr>
                           )}
                         </tbody>

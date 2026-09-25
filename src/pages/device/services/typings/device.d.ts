@@ -136,6 +136,7 @@ declare namespace API_PostLibiioDeviceConfigList {
     metric_value?: number | string
     direction?: "rx" | "tx"
     is_alarm: number
+    is_maintaining?: number
     min?: number | string
     max?: number | string
     created_at?: string
@@ -176,6 +177,7 @@ declare namespace API_PostLibiioDeviceConfigSave {
     rssi_dbm?: number | string
     direction?: "rx" | "tx"
     is_alarm: number | string
+    is_maintaining?: number | string
     min?: number
     max?: number
   }
@@ -222,6 +224,7 @@ declare namespace API_PostLibiioBoardList {
   export interface Channel {
     channel_no: number
     configured: boolean
+    is_maintaining?: boolean
     target_freq_mhz?: number | null
     metric_value?: number | string | null
     alarm_enabled?: number | string | boolean
@@ -257,11 +260,14 @@ declare namespace API_PostLibiioBoardList {
     isolation_db?: number | string | null
     isolation_db_alarm_min?: number | string | null
     isolation_db_alarm_max?: number | string | null
+    isolation_db_alarm_enabled?: number | string | boolean | null
     isolation_db_is_alarm?: number | string | boolean | null
     tx_vswr?: number | string | null
     tx_vswr_alarm_min?: number | string | null
     tx_vswr_alarm_max?: number | string | null
+    tx_vswr_alarm_enabled?: number | string | boolean | null
     tx_vswr_is_alarm?: number | string | boolean | null
+    tx_reverse_power_dbm?: number | string | null
     modules: Module[]
   }
 
