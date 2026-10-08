@@ -652,7 +652,7 @@ const FrequencyBoardPage: React.FC = () => {
                                       chunk.items,
                                       device.tx_reverse_power_dbm,
                                       direction === "tx"
-                                        ? section.chunks
+                                        ? chunks
                                             .flatMap((currentChunk) => currentChunk.items)
                                             .map((item) => getChannelRssiDbmValue(item))
                                             .filter((value) => value !== null && value > 30).length

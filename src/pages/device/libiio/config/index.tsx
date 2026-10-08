@@ -379,23 +379,6 @@ const FrequencyConfigPage: React.FC<FrequencyConfigPageProps> = (props) => {
                                   <Col xs={24} sm={12} lg={8}>
                                     <Form.Item
                                       {...restField}
-                                      name={[field.name, "is_maintaining"]}
-                                      label={t(
-                                        "app.device.libiio.config.isMaintaining",
-                                        "Under Maintenance",
-                                      )}
-                                      getValueProps={(value) => ({ checked: value === 1 })}
-                                      normalize={(checked) => (checked ? 1 : -1)}
-                                    >
-                                      <Switch
-                                        checkedChildren={t("app.common.yes", "Yes")}
-                                        unCheckedChildren={t("app.common.no", "No")}
-                                      />
-                                    </Form.Item>
-                                  </Col>
-                                  <Col xs={24} sm={12} lg={8}>
-                                    <Form.Item
-                                      {...restField}
                                       name={[field.name, "target_freq_mhz"]}
                                       label={t(
                                         "app.device.libiio.config.targetFrequency",
@@ -423,6 +406,23 @@ const FrequencyConfigPage: React.FC<FrequencyConfigPageProps> = (props) => {
                                       <InputNumber
                                         style={{ width: "100%" }}
                                         addonAfter={OFFSET_UNIT}
+                                      />
+                                    </Form.Item>
+                                  </Col>
+                                  <Col xs={24} sm={12} lg={8}>
+                                    <Form.Item
+                                      {...restField}
+                                      name={[field.name, "is_maintaining"]}
+                                      label={t(
+                                        "app.device.libiio.config.isMaintaining",
+                                        "Under Maintenance",
+                                      )}
+                                      getValueProps={(value) => ({ checked: value === 1 })}
+                                      normalize={(checked) => (checked ? 1 : -1)}
+                                    >
+                                      <Switch
+                                        checkedChildren={t("app.common.yes", "Yes")}
+                                        unCheckedChildren={t("app.common.no", "No")}
                                       />
                                     </Form.Item>
                                   </Col>
