@@ -63,6 +63,9 @@ const createEmptyConfigItem = (direction: "rx" | "tx" = "rx"): FrequencyFormItem
   target_freq_mhz: undefined,
   power_offset_db: undefined,
   is_alarm: ALARM_DISABLED_VALUE,
+  rssi_is_alarm: ALARM_DISABLED_VALUE,
+  rssi_min: undefined,
+  rssi_max: undefined,
   is_maintaining: -1,
   min: undefined,
   max: undefined,
@@ -105,7 +108,14 @@ const buildConfigList = (
     sort: config.sort,
     target_freq_mhz: config.target_freq_mhz,
     power_offset_db: toFiniteNumber(config.power_offset_db),
-    is_alarm: config.is_alarm ?? ALARM_DISABLED_VALUE,
+    is_alarm:
+      Number(config.is_alarm) === ALARM_ENABLED_VALUE ? ALARM_ENABLED_VALUE : ALARM_DISABLED_VALUE,
+    rssi_is_alarm:
+      Number(config.rssi_is_alarm) === ALARM_ENABLED_VALUE
+        ? ALARM_ENABLED_VALUE
+        : ALARM_DISABLED_VALUE,
+    rssi_min: toFiniteNumber(config.rssi_min),
+    rssi_max: toFiniteNumber(config.rssi_max),
     is_maintaining: config.is_maintaining ?? -1,
     min: toFiniteNumber(config.min),
     max: toFiniteNumber(config.max),
@@ -120,6 +130,9 @@ const buildConfigPayloadByDirection = (config: FrequencyFormItem, direction: "rx
   target_freq_mhz: config.target_freq_mhz as number,
   power_offset_db: config.power_offset_db,
   is_alarm: config.is_alarm,
+  rssi_is_alarm: config.rssi_is_alarm,
+  rssi_min: config.rssi_min,
+  rssi_max: config.rssi_max,
   is_maintaining: config.is_maintaining ?? -1,
   min: config.min,
   max: config.max,
@@ -537,6 +550,116 @@ const FrequencyConfigPage: React.FC<FrequencyConfigPageProps> = (props) => {
                                     </Form.Item>
                                   </Col>
                                 </Row>
+                                {direction === "tx" ? (
+                                  <Row gutter={[12, 0]}>
+                                    <Col xs={24} sm={12} lg={8}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[field.name, "rssi_is_alarm"]}
+                                        label={t(
+                                          "app.device.libiio.config.rssiIsAlarm",
+                                          "RSSI Alarm Enabled",
+                                        )}
+                                        rules={[
+                                          {
+                                            required: true,
+                                            message: t(
+                                              "app.device.libiio.config.rssiIsAlarmRequired",
+                                              "Please select whether RSSI alarm is enabled",
+                                            ),
+                                          },
+                                        ]}
+                                      >
+                                        <Select
+                                          options={[
+                                            {
+                                              label: t("app.common.yes", "Yes"),
+                                              value: ALARM_ENABLED_VALUE,
+                                            },
+                                            {
+                                              label: t("app.common.no", "No"),
+                                              value: ALARM_DISABLED_VALUE,
+                                            },
+                                          ]}
+                                        />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12} lg={8}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[field.name, "rssi_min"]}
+                                        label={t(
+                                          "app.device.libiio.config.rssiMinValue",
+                                          "RSSI Minimum (dBm)",
+                                        )}
+                                      >
+                                        <InputNumber style={{ width: "100%" }} addonAfter="dBm" />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12} lg={8}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[field.name, "rssi_max"]}
+                                        label={t(
+                                          "app.device.libiio.config.rssiMaxValue",
+                                          "RSSI Maximum (dBm)",
+                                        )}
+                                        dependencies={[
+                                          ["configs", field.name, "rssi_is_alarm"],
+                                          ["configs", field.name, "rssi_min"],
+                                        ]}
+                                        rules={[
+                                          ({ getFieldValue }) => ({
+                                            validator(_, value) {
+                                              const isAlarm =
+                                                getFieldValue([
+                                                  "configs",
+                                                  field.name,
+                                                  "rssi_is_alarm",
+                                                ]) === ALARM_ENABLED_VALUE
+                                              const min = getFieldValue([
+                                                "configs",
+                                                field.name,
+                                                "rssi_min",
+                                              ])
+                                              if (
+                                                isAlarm &&
+                                                isEmptyFieldValue(min) &&
+                                                isEmptyFieldValue(value)
+                                              ) {
+                                                return Promise.reject(
+                                                  new Error(
+                                                    t(
+                                                      "app.device.libiio.config.rssiAlarmRangeRequired",
+                                                      "Please enter RSSI minimum or maximum when alarm is enabled",
+                                                    ),
+                                                  ),
+                                                )
+                                              }
+                                              if (
+                                                typeof min === "number" &&
+                                                typeof value === "number" &&
+                                                min > value
+                                              ) {
+                                                return Promise.reject(
+                                                  new Error(
+                                                    t(
+                                                      "app.device.libiio.config.rssiMaxLessThanMin",
+                                                      "RSSI maximum cannot be less than minimum",
+                                                    ),
+                                                  ),
+                                                )
+                                              }
+                                              return Promise.resolve()
+                                            },
+                                          }),
+                                        ]}
+                                      >
+                                        <InputNumber style={{ width: "100%" }} addonAfter="dBm" />
+                                      </Form.Item>
+                                    </Col>
+                                  </Row>
+                                ) : null}
                               </Card>
                             )
                           })

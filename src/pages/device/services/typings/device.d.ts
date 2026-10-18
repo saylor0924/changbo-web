@@ -136,6 +136,9 @@ declare namespace API_PostLibiioDeviceConfigList {
     metric_value?: number | string
     direction?: "rx" | "tx"
     is_alarm: number
+    rssi_is_alarm?: number
+    rssi_min?: number | string
+    rssi_max?: number | string
     is_maintaining?: number
     min?: number | string
     max?: number | string
@@ -177,6 +180,9 @@ declare namespace API_PostLibiioDeviceConfigSave {
     rssi_dbm?: number | string
     direction?: "rx" | "tx"
     is_alarm: number | string
+    rssi_is_alarm?: number | string
+    rssi_min?: number
+    rssi_max?: number
     is_maintaining?: number | string
     min?: number
     max?: number
@@ -227,7 +233,11 @@ declare namespace API_PostLibiioBoardList {
     is_maintaining?: boolean
     target_freq_mhz?: number | null
     metric_value?: number | string | null
+    vswr?: number | string | null
     alarm_enabled?: number | string | boolean
+    rssi_is_alarm?: number | string | boolean
+    rssi_min?: number | string | null
+    rssi_max?: number | string | null
     alarm_status?: number | null
     status_text?: string
     is_alarm?: number | string
