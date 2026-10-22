@@ -5,10 +5,9 @@ import { useIntl } from "umi"
 import Services from "@/pages/device/services"
 import type { API_PostLibiioBoardList } from "@/pages/device/services/typings/device"
 import {
-  getChannelAlarmStates,
   getChannelStatusTone,
   getDeviceVswrStatus,
-  isAlarmEnabled,
+  getStatusTone,
   toFiniteNumberOrNull,
 } from "./status"
 import type { StatusTone } from "./status"
@@ -61,30 +60,6 @@ type AlarmRow = {
   troubleshooting: string
 }
 
-const getAlarmFlag = (
-  flag?: number | string | boolean | null,
-  value?: number | string | null,
-  min?: number | string | null,
-  max?: number | string | null,
-) => {
-  if (flag !== undefined && flag !== null) {
-    return isAlarmEnabled(flag)
-  }
-
-  const numberValue = toFiniteNumberOrNull(value)
-  if (numberValue === null) {
-    return false
-  }
-
-  const minValue = toFiniteNumberOrNull(min)
-  if (minValue !== null && numberValue < minValue) {
-    return true
-  }
-
-  const maxValue = toFiniteNumberOrNull(max)
-  return maxValue !== null && numberValue > maxValue
-}
-
 const isOfflineValue = (value?: number | string | boolean | null) => {
   if (value === false || value === 0 || value === "0") {
     return true
@@ -131,6 +106,9 @@ const getStatusLabel = (tone: StatusTone) => {
   }
   if (tone === "abnormal") {
     return "Abnormal"
+  }
+  if (tone === "not_calculated") {
+    return "Not calculated"
   }
   return "Not judged"
 }
@@ -255,11 +233,13 @@ const FrequencyBoardPage: React.FC = () => {
   )
 
   const getChannelStatus = useCallback(
-    (channel: BoardChannel, direction: ModuleDirection, device: BoardDevice) => {
-      const tone = getChannelStatusTone(channel, direction, device)
+    (channel: BoardChannel) => {
+      const tone = getChannelStatusTone(channel)
       return {
         text:
-          tone === "none"
+          tone === "not_calculated"
+            ? t("app.device.libiio.board.statusNotCalculated", "Not calculated")
+            : tone === "none"
             ? "-"
             : tone === "abnormal"
             ? t("app.device.libiio.board.statusAbnormal", "Abnormal")
@@ -308,7 +288,7 @@ const FrequencyBoardPage: React.FC = () => {
         values: chunk.map((item) => formatMetricValue(getChannelRssiDbmValue(item), " dBm")),
       })
 
-      const statuses = chunk.map((item) => getChannelStatus(item, direction, device))
+      const statuses = chunk.map((item) => getChannelStatus(item))
       rows.push({
         label: t("app.device.libiio.board.status", "Status"),
         values: statuses.map((item) => item.text),
@@ -324,24 +304,7 @@ const FrequencyBoardPage: React.FC = () => {
   const buildDerivedMetricRows = useCallback(
     (device: BoardDevice): DerivedMetricRow[] => {
       const txVswrStatus = getDeviceVswrStatus(device)
-      const isolationIsAlarm = getAlarmFlag(
-        device.isolation_db_is_alarm,
-        device.isolation_db,
-        device.isolation_db_alarm_min,
-        device.isolation_db_alarm_max,
-      )
-      const getDerivedStatus = (
-        value: number | string | null | undefined,
-        isAlarm: boolean,
-        alarmEnabled?: number | string | boolean | null,
-      ) => {
-        const isJudged = isAlarmEnabled(alarmEnabled) && toFiniteNumberOrNull(value) !== null
-        const statusTone = !isJudged ? "none" : isAlarm ? "abnormal" : "normal"
-        return {
-          status: getStatusLabel(statusTone),
-          statusTone: statusTone as StatusTone,
-        }
-      }
+      const isolationStatus = getStatusTone(device.isolation_db_status)
 
       return [
         {
@@ -355,11 +318,8 @@ const FrequencyBoardPage: React.FC = () => {
           key: "isolation_db",
           label: t("app.device.libiio.board.isolation", "Isolation"),
           value: formatBoardNumber(device.isolation_db, "dB"),
-          ...getDerivedStatus(
-            device.isolation_db,
-            isolationIsAlarm,
-            device.isolation_db_alarm_enabled,
-          ),
+          status: getStatusLabel(isolationStatus),
+          statusTone: isolationStatus,
         },
       ]
     },
@@ -373,8 +333,9 @@ const FrequencyBoardPage: React.FC = () => {
       ;(device.modules || []).forEach((module) => {
         const direction = module.direction
         ;(module.channels || []).forEach((channel) => {
-          const states = getChannelAlarmStates(channel, direction, device)
-          if (states.primary === "abnormal") {
+          const alarmStatus = getStatusTone(channel.alarm_status)
+          const rssiAlarmStatus = getStatusTone(channel.rssi_alarm_status)
+          if (alarmStatus === "abnormal") {
             rows.push({
               key: `${direction}-${channel.channel_no}`,
               summary:
@@ -405,7 +366,7 @@ const FrequencyBoardPage: React.FC = () => {
                     ),
             })
           }
-          if (states.rssi === "abnormal") {
+          if (rssiAlarmStatus === "abnormal") {
             rows.push({
               key: `tx-${channel.channel_no}-rssi`,
               summary: t(
@@ -433,14 +394,7 @@ const FrequencyBoardPage: React.FC = () => {
         })
       }
 
-      if (
-        getAlarmFlag(
-          device.isolation_db_is_alarm,
-          device.isolation_db,
-          device.isolation_db_alarm_min,
-          device.isolation_db_alarm_max,
-        )
-      ) {
+      if (getStatusTone(device.isolation_db_status) === "abnormal") {
         rows.push({
           key: "isolation_db",
           summary: t("app.device.libiio.board.isolationAbnormal", "Isolation abnormal"),

@@ -238,13 +238,15 @@ declare namespace API_PostLibiioBoardList {
     rssi_is_alarm?: number | string | boolean
     rssi_min?: number | string | null
     rssi_max?: number | string | null
-    alarm_status?: number | null
+    alarm_status?: "none" | "normal" | "abnormal" | string
     status_text?: string
     is_alarm?: number | string
     min?: number | string
     max?: number | string
     power_w?: number | string
     rssi_dbm?: number | string
+    status?: "none" | "normal" | "abnormal" | "not_calculated" | string
+    rssi_alarm_status?: "none" | "normal" | "abnormal" | string
   }
 
   export interface Module {
@@ -272,11 +274,13 @@ declare namespace API_PostLibiioBoardList {
     isolation_db_alarm_max?: number | string | null
     isolation_db_alarm_enabled?: number | string | boolean | null
     isolation_db_is_alarm?: number | string | boolean | null
+    isolation_db_status?: "none" | "normal" | "abnormal" | string
     tx_vswr?: number | string | null
     tx_vswr_alarm_min?: number | string | null
     tx_vswr_alarm_max?: number | string | null
     tx_vswr_alarm_enabled?: number | string | boolean | null
     tx_vswr_is_alarm?: number | string | boolean | null
+    tx_vswr_status?: "none" | "normal" | "abnormal" | "not_calculated" | string
     tx_reverse_power_dbm?: number | string | null
     modules: Module[]
   }

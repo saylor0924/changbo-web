@@ -436,6 +436,7 @@ export default {
   "app.device.libiio.board.uncategorized": "未分类频点",
   "app.device.libiio.board.statusAbnormal": "异常",
   "app.device.libiio.board.statusNormal": "正常",
+  "app.device.libiio.board.statusNotCalculated": "不进行计算",
   "app.device.libiio.board.statusHigh": "偏高",
   "app.device.libiio.board.statusLow": "偏低",
   "app.device.libiio.board.frequency": "频率",

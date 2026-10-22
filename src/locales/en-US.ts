@@ -454,6 +454,7 @@ export default {
   "app.device.libiio.board.uncategorized": "Uncategorized Frequencies",
   "app.device.libiio.board.statusAbnormal": "Abnormal",
   "app.device.libiio.board.statusNormal": "Normal",
+  "app.device.libiio.board.statusNotCalculated": "Not calculated",
   "app.device.libiio.board.statusHigh": "High",
   "app.device.libiio.board.statusLow": "Low",
   "app.device.libiio.board.frequency": "Frequency",
