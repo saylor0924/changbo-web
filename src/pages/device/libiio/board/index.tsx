@@ -107,9 +107,6 @@ const getStatusLabel = (tone: StatusTone) => {
   if (tone === "abnormal") {
     return "Abnormal"
   }
-  if (tone === "not_calculated") {
-    return "Not calculated"
-  }
   return "Not judged"
 }
 
@@ -138,23 +135,6 @@ const getChannelPowerWValue = (channel: BoardChannel) => toFiniteNumberOrNull(ch
 
 const getChannelRssiDbmValue = (channel: BoardChannel) =>
   toFiniteNumberOrNull(channel.rssi_dbm ?? channel.metric_value)
-
-const calculateVswr = (
-  forwardDbm: number | null,
-  reverseDbm: number | null,
-  activeCount: number,
-) => {
-  if (forwardDbm === null || reverseDbm === null || activeCount <= 0 || forwardDbm <= 30) {
-    return null
-  }
-  const forwardPower = 10 ** (forwardDbm / 10)
-  const reversePower = 10 ** (reverseDbm / 10) / activeCount
-  if (reversePower < 0 || reversePower >= forwardPower) {
-    return null
-  }
-  const gamma = Math.sqrt(reversePower / forwardPower)
-  return gamma >= 1 ? null : (1 + gamma) / (1 - gamma)
-}
 
 const hasModuleData = (module: BoardModule) =>
   (module.channels || []).some(
@@ -237,9 +217,7 @@ const FrequencyBoardPage: React.FC = () => {
       const tone = getChannelStatusTone(channel)
       return {
         text:
-          tone === "not_calculated"
-            ? t("app.device.libiio.board.statusNotCalculated", "Not calculated")
-            : tone === "none"
+          tone === "none"
             ? "-"
             : tone === "abnormal"
             ? t("app.device.libiio.board.statusAbnormal", "Abnormal")
@@ -251,12 +229,7 @@ const FrequencyBoardPage: React.FC = () => {
   )
 
   const buildDisplayRows = useCallback(
-    (
-      direction: ModuleDirection,
-      chunk: BoardChannel[],
-      device: BoardDevice,
-      activeCountOverride?: number,
-    ) => {
+    (direction: ModuleDirection, chunk: BoardChannel[]) => {
       const rows: DisplayRow[] = [
         {
           label: t("app.device.libiio.board.frequency", "Frequency"),
@@ -265,19 +238,14 @@ const FrequencyBoardPage: React.FC = () => {
       ]
 
       if (direction === "tx") {
-        const forwardPowers = chunk.map((item) => getChannelRssiDbmValue(item))
-        const activeCount =
-          activeCountOverride ??
-          forwardPowers.filter((value) => value !== null && value > 30).length
-        const reversePower = toFiniteNumberOrNull(device.tx_reverse_power_dbm)
         rows.push({
           label: t("app.device.libiio.txMonitorPowerWithUnit", "Power (W)"),
           values: chunk.map((item) => formatMetricValue(getChannelPowerWValue(item), " W")),
         })
         rows.push({
           label: t("app.device.libiio.board.txVswr", "VSWR"),
-          values: forwardPowers.map((value) => {
-            const vswr = calculateVswr(value, reversePower, activeCount)
+          values: chunk.map((item) => {
+            const vswr = toFiniteNumberOrNull(item.vswr)
             return vswr === null ? "-" : `${vswr.toFixed(2)}`
           }),
         })
@@ -552,17 +520,7 @@ const FrequencyBoardPage: React.FC = () => {
                                       ))}
                                     </tr>
 
-                                    {buildDisplayRows(
-                                      direction,
-                                      chunk.items,
-                                      device,
-                                      direction === "tx"
-                                        ? chunks
-                                            .flatMap((currentChunk) => currentChunk.items)
-                                            .map((item) => getChannelRssiDbmValue(item))
-                                            .filter((value) => value !== null && value > 30).length
-                                        : undefined,
-                                    ).map((row) => (
+                                    {buildDisplayRows(direction, chunk.items).map((row) => (
                                       <tr
                                         key={`${device.device_id}-${direction}-${chunk.key}-${row.label}`}
                                       >

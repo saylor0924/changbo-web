@@ -178,6 +178,7 @@ declare namespace API_PostLibiioDeviceConfigSave {
     power_offset_db?: number | string
     power_w?: number | string
     rssi_dbm?: number | string
+    vswr?: number | string | null
     direction?: "rx" | "tx"
     is_alarm: number | string
     rssi_is_alarm?: number | string
@@ -245,7 +246,7 @@ declare namespace API_PostLibiioBoardList {
     max?: number | string
     power_w?: number | string
     rssi_dbm?: number | string
-    status?: "none" | "normal" | "abnormal" | "not_calculated" | string
+    status?: "none" | "normal" | "abnormal" | string
     rssi_alarm_status?: "none" | "normal" | "abnormal" | string
   }
 
@@ -280,7 +281,8 @@ declare namespace API_PostLibiioBoardList {
     tx_vswr_alarm_max?: number | string | null
     tx_vswr_alarm_enabled?: number | string | boolean | null
     tx_vswr_is_alarm?: number | string | boolean | null
-    tx_vswr_status?: "none" | "normal" | "abnormal" | "not_calculated" | string
+    tx_vswr_status?: "none" | "normal" | "abnormal" | string
+    tx_forward_power_dbm?: number | string | null
     tx_reverse_power_dbm?: number | string | null
     modules: Module[]
   }

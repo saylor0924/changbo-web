@@ -1,6 +1,6 @@
 import type { API_PostLibiioBoardList } from "@/pages/device/services/typings/device"
 
-export type StatusTone = "normal" | "abnormal" | "none" | "not_calculated"
+export type StatusTone = "normal" | "abnormal" | "none"
 
 export const toFiniteNumberOrNull = (value?: number | string | null) => {
   if (typeof value === "number") {
@@ -17,7 +17,6 @@ export const getStatusTone = (status?: string | null): StatusTone => {
   switch (status) {
     case "normal":
     case "abnormal":
-    case "not_calculated":
       return status
     default:
       return "none"
