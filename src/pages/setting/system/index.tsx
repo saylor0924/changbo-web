@@ -1,31 +1,28 @@
 import React, { useState, useEffect, useCallback } from "react"
 import { PageContainer } from "@ant-design/pro-components"
-import type { UploadProps, UploadFile } from "antd"
+import type { UploadProps } from "antd"
 import { Divider, Select, Switch } from "antd"
 import { Card, Form, Input, Button, message, Upload } from "antd"
 import { LoadingOutlined, PlusOutlined } from "@ant-design/icons"
-import type { RcFile, UploadChangeParam } from "antd/es/upload"
+import type { RcFile } from "antd/es/upload"
 import Services from "@/pages/setting/services"
 import { SYSTEM_CONFIG } from "@/constants"
 import { useIntl } from "umi"
 import { BASE_LOCALE, I18N_ENABLED } from "@/utils/i18n"
 
-const getBase64 = (img: RcFile, callback: (url: string) => void) => {
-  const reader = new FileReader()
-  reader.addEventListener("load", () => callback(reader.result as string))
-  reader.readAsDataURL(img)
-}
-
 const beforeUpload = (file: RcFile, t: (id: string, defaultMessage: string) => string) => {
-  const isPng = file.type === "image/png"
-  if (!isPng) {
-    message.error(t("app.setting.system.logo.onlyPng", "You can only upload PNG files"))
+  const supportedTypes = ["image/png", "image/jpeg", "image/gif"]
+  const isSupportedImage = supportedTypes.includes(file.type)
+  if (!isSupportedImage) {
+    message.error(
+      t("app.setting.system.logo.supportedFormats", "Supported formats: PNG, JPG, and GIF"),
+    )
   }
-  const isLt2M = file.size / 1024 / 1024 < 2
-  if (!isLt2M) {
+  const isLt20M = file.size / 1024 / 1024 <= 20
+  if (!isLt20M) {
     message.error(t("app.setting.system.logo.sizeLimit", "Image must be smaller than 2 MB"))
   }
-  return isPng && isLt2M
+  return isSupportedImage && isLt20M
 }
 
 const SystemSetting: React.FC = () => {
@@ -72,20 +69,21 @@ const SystemSetting: React.FC = () => {
       })
   }
 
-  const handleChange: UploadProps["onChange"] = (info: UploadChangeParam<UploadFile>) => {
-    if (info.file.status === "uploading") {
-      setLoading(true)
-      return
-    }
-    if (info.file.status === "done") {
-      // Get this url from response in real world.
-      getBase64(info.file.originFileObj as RcFile, (url) => {
-        setLoading(false)
+  const handleUpload: UploadProps["customRequest"] = (options) => {
+    setLoading(true)
+    Services.api
+      .postSystemLogoUpload({ file: options.file }, { showToast: true })
+      .then((res) => {
+        const url = res?.res?.system_logo
+        if (!url) throw new Error("Logo upload did not return a path")
         setImageUrl(url)
-        // 将图片URL设置到表单字段
         form.setFieldsValue({ system_logo: url })
+        options.onSuccess?.(res)
       })
-    }
+      .catch((error) => {
+        options.onError?.(error)
+      })
+      .finally(() => setLoading(false))
   }
 
   const uploadButton = (
@@ -115,15 +113,20 @@ const SystemSetting: React.FC = () => {
             />
           </Form.Item>
           <Form.Item
-            labelCol={{ span: 6 }}
-            label={t("app.setting.system.logo", "System Logo")}
             name="system_logo"
+            hidden
             rules={[
               {
                 required: true,
                 message: t("app.setting.system.logo.required", "Please upload a logo"),
               },
             ]}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
+            labelCol={{ span: 6 }}
+            label={t("app.setting.system.logo", "System Logo")}
             style={{ maxWidth: 600 }}
           >
             <Upload
@@ -131,7 +134,7 @@ const SystemSetting: React.FC = () => {
               className="avatar-uploader"
               showUploadList={false}
               beforeUpload={(file) => beforeUpload(file, t)}
-              onChange={handleChange}
+              customRequest={handleUpload}
             >
               {imageUrl ? (
                 <img src={imageUrl} alt="avatar" style={{ width: "100%" }} />

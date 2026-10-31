@@ -37,3 +37,20 @@ export async function postSystemConfigSave(
 
   return res
 }
+
+export async function postSystemLogoUpload(
+  obj: Record<string, any>,
+  extParams?: PassExtParamsDescriptorMore,
+) {
+  const res = await postApi(
+    "system/logo/upload",
+    { ...obj },
+    {
+      "Content-Type": "multipart/form-data",
+      showLoading: false,
+      showToast: false,
+      ...extParams,
+    },
+  )
+  return res
+}
